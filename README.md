@@ -1,4 +1,5 @@
 # ajenda
+![ajenda](https://cdn1.iconfinder.com/data/icons/significon/512/Significon-List-512.png)
 
 Clojure utility functions for scheduling side effects. The focus is on retrying, expiring (aka timeout-ing) & planning (aka scheduling). 
 
