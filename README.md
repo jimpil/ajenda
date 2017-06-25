@@ -10,7 +10,7 @@ Clojure utility functions for scheduling side effects. The focus is on retrying,
 `ajenda.retrying` exposes 4 macros:
 
 1. *with-max-retries* [max-retries condition & body]
-Repeatedly executes <body> until either it returns a satisfactory result (via <condition>), or <max-retries> has been reached.
+Repeatedly executes `<body>` until either it returns a satisfactory result (via `<condition>`), or `<max-retries>` has been reached.
 
 Example:
 
@@ -30,7 +30,7 @@ Hi!
 
 
 2. *with-retries* [condition & body]
-Repeatedly executes <body> until it returns a satisfactory result (via <condition>).
+Repeatedly executes `<body>` until it returns a satisfactory result (via `<condition>`).
 
 Example:
 
@@ -55,8 +55,8 @@ Hi!
 ```
 
 3. *with-retries-timeout* [timeout-ms timeout-res condition & body]
-Repeatedly executes <body> until either it returns a satisfactory result (via <condition>), or <timeout-ms> has elapsed, 
-in which case <timeout-res> is returned.
+Repeatedly executes `<body>` until either it returns a satisfactory result (via `<condition>`), or `<timeout-ms>` has elapsed, 
+in which case `<timeout-res>` is returned.
 
 Example:
 
@@ -74,8 +74,8 @@ Hi!
 
 
 4. *with-max-retries-timeout* [timeout timeout-res max-retries condition & body]
-Repeatedly executes <body> until either it returns a satisfactory result (via <condition>), or <max-retries> has been reached, 
-or <timeout-ms> has elapsed, in which case <timeout-res> is returned.
+Repeatedly executes `<body>` until either it returns a satisfactory result (via `<condition>`), or `<max-retries>` has been reached, 
+or `<timeout-ms>` has elapsed, in which case `<timeout-res>` is returned.
 
 
 ```clj
@@ -121,7 +121,7 @@ Example:
 
 1. *periodically*  [delay interval executor & body]
 
-Schedules <body> for periodic execution at fixed intervals, with an optional initial <delay>.
+Schedules `<body>` for periodic execution at fixed intervals, with an optional initial `<delay>`.
 
 Example:
 ```clj
@@ -141,7 +141,7 @@ Example:
 
 2. *do-after!* [delay exec & body]
 
-Schedules <body> for execution after <delay> milliseconds.
+Schedules `<body>` for execution after <delay> milliseconds.
 
 Example:
 ```clj
@@ -155,7 +155,7 @@ Example:
 
 3. *do-at!* [date-time executor & body]
 
-Schedules <body> for execution at that particular <date-time> string (per *DateTimeFormatter.ISO_DATE_TIME*).
+Schedules <body> for execution at that particular `<date-time>` string (per *DateTimeFormatter.ISO_DATE_TIME*).
 It also accepts LocalDateTime objects for better integration with existing code, or in case the ISO_DATE_TIME format isn't to our liking.
 
 Example:
@@ -171,7 +171,7 @@ Builds on top of `do-at!`, and accepts a map of schedules (task-id => [date-time
 Supports an optional global timeout, after which any tasks not yet started will never run. 
 Returns a vector with 2 functions. First one expects either 1 argument -
 the id of the task  you want cancelled, or no-args if you happen to want to cancel them all.
-In the absence of a <global-timeout> the second item in the vector will be nil, otherwise it will be a function which cancels the <global-timeout>.
+In the absence of a `<global-timeout>` the second item in the vector will be nil, otherwise it will be a function which cancels the `<global-timeout>`.
 
 5. *periodic-multischedule* [global-timeout executor schedules]
 
