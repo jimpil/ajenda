@@ -14,13 +14,14 @@
        :scheduled (Executors/newScheduledThreadPool n-threads factory)
        :scheduled-solo (Executors/newSingleThreadScheduledExecutor factory)
        :fixed (if (= 1 n-threads)
-                (recur :solo n-threads factory)
+                (thread-pool :solo n-threads factory)
                 (Executors/newFixedThreadPool n-threads factory))
        :cached (Executors/newCachedThreadPool factory)
        :solo (Executors/newSingleThreadExecutor factory)))))
 
 
 (defn thread-interrupted?
+  "Wrapper around `Thread.isInterrupted`."
   ([_] ;; convenience overload (see `ajenda.retrying/with-max-retries-timeout`)
    (thread-interrupted?))
   ([]
