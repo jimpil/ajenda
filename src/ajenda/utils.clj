@@ -18,3 +18,10 @@
                 (Executors/newFixedThreadPool n-threads factory))
        :cached (Executors/newCachedThreadPool factory)
        :solo (Executors/newSingleThreadExecutor factory)))))
+
+
+(defn thread-interrupted?
+  ([_] ;; convenience overload (see `ajenda.retrying/with-max-retries-timeout`)
+   (thread-interrupted?))
+  ([]
+   (.isInterrupted (Thread/currentThread))))

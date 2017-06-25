@@ -9,7 +9,7 @@
 
    ATTENTION: Cancelling the future doesn't necessarily stop the thread.
    The code running on that thread must be actively checking for the interrupt signal,
-   in order for the execution to stop gracefully (see `cub.retrying/with-retries-timeout` for an example)."
+   in order for the execution to stop gracefully (see `ajenda.retrying/with-retries-timeout` for an example)."
   ([[_timeout _unit :as t] timeout-res f]
    (with-timeout* t nil timeout-res f))
   ([[timeout unit] ^ExecutorService pool timeout-res ^Callable f]
@@ -29,10 +29,10 @@
 
 (defmacro with-timeout
   "A generic way to execute arbitrary code (which returns a result) with a timeout in milliseconds (<ms>).
-  This is essentially the same as `clojure.core/deref-future`
-  with the only difference being that we cancel the future before exiting.
-  <executor-service> ^ExecutorService to submit the body to - if nil uses clojure.core/future.
-  Blocks the current thread (via `Future.get(...)`)."
+   This is essentially the same as `clojure.core/deref-future`
+   with the only difference being that we cancel the future before exiting.
+   <executor-service> ^ExecutorService to submit the body to - if nil uses clojure.core/future.
+   Blocks the current thread (via `Future.get(...)`)."
   [ms executor-service timeout-result & body]
   `(with-timeout* [~ms TimeUnit/MILLISECONDS]
      ~executor-service
