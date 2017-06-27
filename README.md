@@ -184,8 +184,7 @@ Returns the same vector of 2 functions as `adhoc-multischedule`.
  
 1. As evidenced by the demo code above, wherever you see an <executor> argument in `ajenda.planning`, you can pass nil and one will be created for you (via `Executors/newSingleThreadScheduledExecutor`). 
 2. `ajenda.expiring/with-timeout` can also take nil as its <exec> argument, in which case it will create a future.
-3.  There are public functions that are suffixed with *. These are actually the functions that do all the work, but they don't always mirror the arguments of the macros - so take caution using those!
-4. `ajenda.retrying/with-retries*` which is the basis for all the retrying utils, uses unchecked integer arithmetic. This was a conscious decision. For all intents and purposes, if you care about the loop index in your program, you're not going to reach the overflow point anyway. If, on the other hand, your code doesn't depend on it (e.g. because of a timeout), then who cares if it overflows?   
+3.  There are public functions that are suffixed with *. These are actually the functions that do all the work, but they don't always mirror the arguments of the macros - so take caution using those!   
 
 
 ## License

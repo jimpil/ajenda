@@ -4,17 +4,15 @@
 
 (defn with-retries*
   "Retries <f> (a fn of no args) until either <done?> (a fn of 1 arg: the result of `(f)`) returns a truthy value,
-  in which case  the result of `(f)` is retuned, or <retry?> (a fn of 1 arg - the current retry number) returns false,
+  in which case  the result of `(f)` is returned, or <retry?> (a fn of 1 arg - the current retry number) returns false,
   in which case nil is returned."
   [retry? done? f]
-  ;; use primitive ints - if we happen to overflow here, then we can (realistically)
-  ;; assume that the caller doesn't care about <i> (e.g. `ajenda.retrying/with-retries`)
-  (loop [i (int 0)]
+  (loop [i 0]
     (when (retry? i)
       (let [res (f)]
         (if (done? res)
           res
-          (recur (unchecked-inc-int i)))))))
+          (recur (unchecked-inc i)))))))
 
 (defmacro with-max-retries
   "Like <with-retries*>, but accepts an arbitrary number of forms as <body>."
