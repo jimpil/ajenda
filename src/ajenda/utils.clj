@@ -26,3 +26,35 @@
    (thread-interrupted?))
   ([]
    (.isInterrupted (Thread/currentThread))))
+
+(defn- catch-all*
+  "Produces a list of `catch` clauses for all exception classes <exs>
+   with the same <catch-tail>."
+  [[_catch-all exs & catch-tail]]
+  (map #(list* 'catch % (gensym) catch-tail) exs))
+
+(def ^:private catches-map
+  {"catch" 'catch
+   "catch-all" 'catch-all})
+
+(defmacro try+
+  "Same as `clojure.core/try`, but also recognises `catch-all` clause(s).
+   These must be in the same form as regular `catch`, but instead of a
+   single exception class, you are expected to provide a vector of them."
+  [& bodies]
+  (let [[body catches] (reduce
+                         (fn [res [fsymbol & args :as exp]]
+                           (let [fname (name fsymbol)]
+                             (if (contains? catches-map fname)
+                             (update res 1 conj (list* (get catches-map fname) args))
+                             (update res 0 conj exp))))
+                         [[][]]
+                         bodies)
+        catch-all? #(and (seq? %)
+                         (= (first %) 'catch-all))
+        catch-all-guard (fn [form]
+                          (if (catch-all? form)
+                            (catch-all* form)
+                            [form]))]
+    `(try ~@body
+          ~@(mapcat catch-all-guard catches))))

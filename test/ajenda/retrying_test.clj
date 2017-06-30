@@ -1,7 +1,8 @@
 (ns ajenda.retrying-test
   (:require [clojure.test :refer :all]
             [ajenda.retrying :refer :all])
-  (:import (java.util.concurrent.atomic AtomicInteger)))
+  (:import (java.util.concurrent.atomic AtomicInteger)
+           (clojure.lang ExceptionInfo)))
 
 (deftest with-max-retries-tests
   (let [check-box (AtomicInteger. 0)]
@@ -43,6 +44,28 @@
     ;; finds an answer
     (is (= 15000 (with-retries (partial = 15000) (.incrementAndGet check-box))))
     (is (= 15000 (.get check-box)))
+    )
+  )
+
+(deftest with-max-error-retries-tests
+  (let [check-box (AtomicInteger. 0)]
+
+    ;; max-retries elapsed - no answer
+    (is (nil? (with-max-error-retries 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
+                (condp = (.getAndIncrement check-box)
+                  0 (throw (ArithmeticException. ""))
+                  1 (throw (IndexOutOfBoundsException. ""))
+                  2 (throw (ex-info "" {}))
+                  :whatever))))
+
+    (.set check-box 0) ;reset it
+
+    (is (= :whatever (with-max-error-retries 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
+                       (condp = (.getAndIncrement check-box)
+                         0 (throw (ArithmeticException. ""))
+                         1 (throw (IndexOutOfBoundsException. ""))
+                         2 :whatever
+                         nil))))
     )
   )
 
