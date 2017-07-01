@@ -47,25 +47,43 @@
     )
   )
 
+(deftest with-error-retries-tests
+  (let [check-box (AtomicInteger. 0)]
+
+    ;; answer found on the 10th retry
+    (is (= :whatever
+           (with-error-retries [ArithmeticException IndexOutOfBoundsException]
+             (condp = (.getAndIncrement check-box)
+               5 (throw (IndexOutOfBoundsException. ""))
+               10 :whatever
+               (throw (ArithmeticException. ""))))))
+
+    )
+
+  )
+
 (deftest with-max-error-retries-tests
   (let [check-box (AtomicInteger. 0)]
 
     ;; max-retries elapsed - no answer
-    (is (nil? (with-max-error-retries 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
-                (condp = (.getAndIncrement check-box)
-                  0 (throw (ArithmeticException. ""))
-                  1 (throw (IndexOutOfBoundsException. ""))
-                  2 (throw (ex-info "" {}))
-                  :whatever))))
+    (is (nil?
+          (with-max-error-retries 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
+            (condp = (.getAndIncrement check-box)
+              0 (throw (ArithmeticException. ""))
+              1 (throw (IndexOutOfBoundsException. ""))
+              2 (throw (ex-info "" {}))
+              :whatever))))
 
     (.set check-box 0) ;reset it
 
-    (is (= :whatever (with-max-error-retries 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
-                       (condp = (.getAndIncrement check-box)
-                         0 (throw (ArithmeticException. ""))
-                         1 (throw (IndexOutOfBoundsException. ""))
-                         2 :whatever
-                         nil))))
+    ;; found an answer before max-retries
+    (is (= :whatever
+           (with-max-error-retries 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
+             (condp = (.getAndIncrement check-box)
+               0 (throw (ArithmeticException. ""))
+               1 (throw (IndexOutOfBoundsException. ""))
+               2 :whatever
+               nil))))
     )
   )
 
@@ -78,7 +96,7 @@
 
     (.set check-box 0)
     ;; answer found before timeout
-    (is (= 1 (with-retries-timeout 10 :done some? (.incrementAndGet check-box))))
+    (is (= 1 (with-retries-timeout 20 :done some? (.incrementAndGet check-box))))
     )
   )
 
