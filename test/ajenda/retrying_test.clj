@@ -57,9 +57,26 @@
                5 (throw (IndexOutOfBoundsException. ""))
                10 :whatever
                (throw (ArithmeticException. ""))))))
-
     )
 
+  )
+
+(deftest with-error-retries-timeout-tests
+  (let [check-box (AtomicInteger. 0)]
+
+    ;; timeout elapsed - return :done
+    (is (= :done
+           (with-error-retries-timeout 10 :done [ArithmeticException IndexOutOfBoundsException]
+             (throw (ArithmeticException. "")))))
+
+    ;; answer found after 10 retries and before 100ms
+    (is (= 10
+           (with-error-retries-timeout 100 :done [ArithmeticException IndexOutOfBoundsException]
+             (let [i (.getAndIncrement check-box)]
+               (if (= 10 i)
+                 i
+                 (throw (ArithmeticException. "")))))))
+    )
   )
 
 (deftest with-max-error-retries-tests
