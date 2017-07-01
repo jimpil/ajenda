@@ -42,8 +42,9 @@
   (let [check-box (AtomicInteger. 0)]
 
     ;; finds an answer
-    (is (= 15000 (with-retries (partial = 15000) (.incrementAndGet check-box))))
-    (is (= 15000 (.get check-box)))
+    (is (= 150 (with-retries (partial = 150)
+                 (.incrementAndGet check-box))))
+    (is (= 150 (.get check-box)))
     )
   )
 
