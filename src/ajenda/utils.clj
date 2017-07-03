@@ -31,9 +31,9 @@
   "Produces a list of `catch` clauses for all exception classes <exs>
    with the same <catch-tail>."
   [[_catch-all exs & catch-tail]]
-  (map #(list* 'catch % (gensym) catch-tail) exs))
+  (map #(list* 'catch % catch-tail) exs))
 
-(def ^:private catches-map
+(def ^:private supported-catches
   {"catch" 'catch
    "catch-all" 'catch-all})
 
@@ -45,8 +45,8 @@
   (let [[body catches] (reduce
                          (fn [res [fsymbol & args :as exp]]
                            (let [fname (name fsymbol)]
-                             (if (contains? catches-map fname)
-                             (update res 1 conj (list* (get catches-map fname) args))
+                             (if (contains? supported-catches fname)
+                             (update res 1 conj (list* (get supported-catches fname) args))
                              (update res 0 conj exp))))
                          [[][]]
                          bodies)
@@ -58,3 +58,6 @@
                             [form]))]
     `(try ~@body
           ~@(mapcat catch-all-guard catches))))
+
+(defonce do-nothing
+  (constantly nil))
