@@ -119,3 +119,52 @@
   )
 
 
+(deftest retrying-options-tests
+  (let [check-box (AtomicInteger. 0)]
+
+    (testing "testing :retry-fn!"
+
+      (with-max-retries {:retry-fn! (fn [_] (.getAndIncrement check-box))}
+                        10
+                        (constantly false)
+                        (.getAndIncrement check-box))
+
+      (is (= 20 (.get check-box))) ;; got incremented twice per iteration
+
+      )
+
+    (.set check-box 0)
+    (testing "delay-opts"
+      (testing "ms"
+        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
+                               :delay-opts {:ms 100}}
+                              1000
+                              nil
+                              (constantly false)
+                              (.getAndIncrement check-box))
+
+        (is (= 20 (.get check-box))) ;; ended up doing 10 iterations due to the delay (1000 / 100 = 10)
+        )
+
+      (.set check-box 0)
+      (testing "increasing backoff (10x)"
+        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
+                               :delay-opts {:ms 10
+                                            :backoff 10}} ;; ten-fold increase at each iteration
+                              1000
+                              nil
+                              (constantly false)
+                              (.getAndIncrement check-box))
+
+        (is (= 6 (.get check-box))) ;; only 3 iterations fit in 1000 ms due to the increasing delays (10 => 100 => 1000)
+        )
+      )
+
+
+
+
+    )
+
+  )
+
+
