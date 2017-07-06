@@ -4,16 +4,18 @@
   (:import (java.util.concurrent.atomic AtomicLong)))
 
 (defn max-retries-limiter
+  "Returns `(partial > max-retries)`."
   [max-retries]
   (assert (and (integer? max-retries)
                (pos? max-retries))
-          "<max-retries> is expected to be a positive integer!")
+          "Negative or zero <max-retries> is not allowed!")
   (partial > max-retries))
 
 (defn exception-success-condition
+  "Returns `(partial not= ::error)`."
   [exceptions]
   (assert (every? (partial instance? Class) exceptions))
-  (partial not= :ajenda.retrying/error)) ;; anything that doesn't throw one of <exceptions> succeeds
+  (partial not= ::error)) ;; anything that doesn't throw one of <exceptions> succeeds
 
 
 (defn- delayer
