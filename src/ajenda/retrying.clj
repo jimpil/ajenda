@@ -17,6 +17,7 @@
 
 
 (defn- delayer
+  "Returns the appropriate delaying function, given the options passed."
   [{:keys [ms delay-fn! backoff]}]
   (cond
     ;; caller wants full control - ignore any other delaying-related options
@@ -58,7 +59,7 @@
                 the very first try (i.e. the fn will never see `0`).
 
   :delay-opts  {:delay-fn! #(...)  ;; custom delaying function (must accept 1 argument).
-                                   ;; Renders any other delaying options useless.
+                                   ;; Renders any other delaying option (see below) useless.
 
                 :ms 1000    ;; Some positive integer value specifying how many milliseconds to delay retrying.
                             ;; It applies right after <retry-fn!>, and only on the first retry onwards

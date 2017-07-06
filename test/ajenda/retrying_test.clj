@@ -155,14 +155,23 @@
                               nil
                               (constantly false)
                               (.getAndIncrement check-box))
+        ;; only 3 iterations fit in 1000 ms due to the (increasing) delays (10 => 100 => 1000)
+        (is (= 6 (.get check-box)))
+        )
 
-        (is (= 6 (.get check-box))) ;; only 3 iterations fit in 1000 ms due to the increasing delays (10 => 100 => 1000)
+      (.set check-box 0)
+      (testing "decreasing backoff (2x)"
+        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
+                               :delay-opts {:ms 600
+                                            :backoff 0.5}}
+                              1000
+                              nil
+                              (constantly false)
+                              (.getAndIncrement check-box))
+        ;; only 3 iterations fit in 1000 ms due to the (decreasing) delays (600 => 900 => 1050)
+        (is (= 6 (.get check-box)))
         )
       )
-
-
-
-
     )
 
   )
