@@ -18,30 +18,56 @@
   (partial not= ::error)) ;; anything that doesn't throw one of <exceptions> succeeds
 
 
-(defn- delayer
-  "Returns the appropriate delaying function, given the options passed."
-  [{:keys [ms delay-fn! backoff]}]
-  (cond
-    ;; caller wants full control - ignore any other delaying-related options
-    (fn? delay-fn!) delay-fn!
+(defn mul-delay
+  "Returns a function which will block the current thread via `Thread/sleep`
+   using increasing/decreasing <ms> (positive amount of milliseconds).
+   The rate of increase/decrease is controlled by <multiplier> (a positive number).
+   This has multiplication semantics. At each retry you will get
+   `(* ms (Math/pow multiplier retry))` delaying. If <multiplier> & <ms> are the same value,
+   what you get is essentially `exponential-backoff` style of delaying."
+  [ms multiplier]
+  (assert (pos? ms)
+          "Negative or zero <ms> is NOT allowed!")
+  (assert (and (pos? multiplier)
+               (not= 1 multiplier))
+          "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `constant-delay` for that)...")
 
-    ;; caller wants ms delay, potentially with a backoff
-    (integer? ms)
-    (do (assert (pos? ms)
-                "Negative or zero <ms> is NOT allowed!")
-        (if-let [backoff-ms (when (number? backoff)
-                              (assert (pos? backoff)
-                                      "Negative or zero <backoff> is NOT allowed!")
-                              (AtomicLong. ms))]
-          (fn [_]
-            (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-              (Thread/sleep
-                (.getAndSet backoff-ms (* backoff (.get backoff-ms))))))
-          (fn [_]
-            (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-              (Thread/sleep ms)))))
-    :else ;; caller doesn't want any delaying
-    ut/do-nothing))
+  (fn [retry]
+    (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
+      (Thread/sleep
+        (* ms (Math/pow multiplier retry))))))
+
+(defn exponential-delay
+  "Returns a function which will block the current thread via `Thread/sleep`,
+   using exponential delaying. See `mul-delay` for details."
+  [ms]
+  (mul-delay ms ms))
+
+
+(defn add-delay
+  "Returns a function which will block the current thread via `Thread/sleep`,
+   using fixed increments. This has addition semantics.
+   At each retry you will get `(+ current-ms fixed-increment)` delaying."
+  [ms fixed-increment]
+  (assert (pos? ms)
+          "Negative or zero <ms> is NOT allowed!")
+
+  (let [dlay-ms (AtomicLong. ms)]
+    (fn [_]
+      (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
+        (Thread/sleep
+          (.getAndAdd dlay-ms fixed-increment))))))
+
+(defn fixed-delay
+  "Returns a function which will block the current thread via `Thread/sleep`
+   using fixed <ms> (positive amount of milliseconds)."
+  [ms]
+  (assert (pos? ms)
+          "Negative or zero <ms> is NOT allowed!")
+
+  (fn [_]
+    (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
+      (Thread/sleep ms))))
 
 
 
@@ -57,26 +83,28 @@
    <opts> can be a map supporting the following options:
 
   :retry-fn!    A (presumably side-effecting) function of 1 argument (the current retrying attempt).
-                Logging can be implemented on top of this for example. Runs on the first retry onwards - NOT on
-                the very first try (i.e. the fn will never see `0`).
+                Logging can be implemented on top of this for example.
 
-  :delay-opts  {:delay-fn! #(...)  ;; custom delaying function (must accept 1 argument).
-                                   ;; Renders any other delaying option (see below) useless.
-
-                :ms 1000    ;; Some positive integer value specifying how many milliseconds to delay retrying.
-                            ;; It applies right after <retry-fn!>, and only on the first retry onwards
-                            ;; (i.e. the very first try will NOT be delayed)
-
-                :backoff 2} ;; To be used in conjunction with <:ms>. A backoff greater than 1 will produce
-                            ;; exponentially increasing delays, whereas less than 1 will produce exponentially
-                            ;; decreasing ones. Negative or zero values are not allowed."
+  :delay-fn!    A delay producing function of 1 argument (the current retrying attempt).
+                See `constant-delay` & `exponential-delay` for two candidates."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
   ([retry? done? f opts]
-   (let [{:keys [retry-fn! delay-opts]} opts
-         delay! (delayer delay-opts)
-         retry!+delay! (cond-> delay!
-                               (fn? retry-fn!) (comp retry-fn!))]
+   (let [{:keys [retry-fn! delay-fn!]} opts
+         retry!+delay! (if (fn? retry-fn!)
+                         (if (fn? delay-fn!)
+                           (fn [i]
+                             ;; do both
+                             (retry-fn! i)
+                             (delay-fn! i))
+                           (fn [i]
+                             ;; only retry
+                             (retry-fn! i)))
+                         (if (fn? delay-fn!)
+                           (fn [i]
+                             ;;only delay
+                             (delay-fn! i))
+                           ut/do-nothing))]
      (loop [i 0]
        (when (retry? i)
          (let [res (f)]
