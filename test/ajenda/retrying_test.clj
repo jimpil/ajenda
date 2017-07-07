@@ -147,9 +147,22 @@
         )
 
       (.set check-box 0)
-      (testing "increasing (10x) mul-delay (aka exponential backoff)"
+
+      (testing "additive-delay"
         (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
-                               :delay-fn! (exponential-delay 10) ;; 10^1 - 10^N progression (ten-fold increase at each iteration)
+                               :delay-fn! (additive-delay 100 50)} ;; 100 => 150 => 200 => 250 ...
+                              1000
+                              nil
+                              (constantly false)
+                              (.getAndIncrement check-box))
+        ;; 100 + 150 + 200 + 250 + 300 = 1000
+        (is (= 10 (.get check-box))) ;; there was not enough time for the 6th iteration
+        )
+
+      (.set check-box 0)
+      (testing "increasing (10x) multiplicative-delay (aka exponential-backoff)"
+        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
+                               :delay-fn! (exponential-delay 10) ;; 10^1 - 10^N progression (ten-fold increase on each iteration)
                                }
                               1000
                               nil
@@ -160,9 +173,9 @@
         )
 
       (.set check-box 0)
-      (testing "decreasing (2x) mul-delay"
+      (testing "decreasing (2x) multiplicative-delay"
         (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
-                               :delay-fn! (mul-delay 600 0.5)} ;; 2x decrease at each iteration
+                               :delay-fn! (multiplicative-delay 600 0.5)} ;; 2x decrease at each iteration
                               1000
                               nil
                               (constantly false)

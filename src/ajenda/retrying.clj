@@ -18,7 +18,7 @@
   (partial not= ::error)) ;; anything that doesn't throw one of <exceptions> succeeds
 
 
-(defn mul-delay
+(defn multiplicative-delay
   "Returns a function which will block the current thread via `Thread/sleep`
    using increasing/decreasing <ms> (positive amount of milliseconds).
    The rate of increase/decrease is controlled by <multiplier> (a positive number).
@@ -30,7 +30,7 @@
           "Negative or zero <ms> is NOT allowed!")
   (assert (and (pos? multiplier)
                (not= 1 multiplier))
-          "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `constant-delay` for that)...")
+          "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `fixed-delay` for that effect)...")
 
   (fn [retry]
     (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
@@ -39,12 +39,12 @@
 
 (defn exponential-delay
   "Returns a function which will block the current thread via `Thread/sleep`,
-   using exponential delaying. See `mul-delay` for details."
+   using exponential delaying. See `multiplicative-delay` for details."
   [ms]
-  (mul-delay ms ms))
+  (multiplicative-delay ms ms))
 
 
-(defn add-delay
+(defn additive-delay
   "Returns a function which will block the current thread via `Thread/sleep`,
    using fixed increments. This has addition semantics.
    At each retry you will get `(+ current-ms fixed-increment)` delaying."
@@ -86,7 +86,7 @@
                 Logging can be implemented on top of this for example.
 
   :delay-fn!    A delay producing function of 1 argument (the current retrying attempt).
-                See `constant-delay` & `exponential-delay` for two candidates."
+                See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
   ([retry? done? f opts]
