@@ -61,3 +61,6 @@
 
 (defonce do-nothing
   (constantly nil))
+
+(def not-identical?
+  (complement identical?))

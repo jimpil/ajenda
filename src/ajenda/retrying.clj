@@ -11,20 +11,25 @@
           "Negative or zero <max-retries> is not allowed!")
   (partial > max-retries))
 
+(defonce ERROR ::error)
+
 (defn exception-success-condition
   "Returns `(partial not= ::error)`."
   [exceptions]
   (assert (every? (partial instance? Class) exceptions))
-  (partial not= ::error)) ;; anything that doesn't throw one of <exceptions> succeeds
+  (partial ut/not-identical? ERROR)) ;; anything that doesn't throw one of <exceptions> succeeds
 
 
 (defn multiplicative-delay
-  "Returns a function which will block the current thread via `Thread/sleep`
+  "Returns a vector of 2 functions.
+   The first one will block the current thread via `Thread/sleep`
    using increasing/decreasing <ms> (positive amount of milliseconds).
    The rate of increase/decrease is controlled by <multiplier> (a positive number).
    This has multiplication semantics. At each retry you will get
-   `(* ms (Math/pow multiplier retry))` delaying. If <multiplier> & <ms> are the same value,
-   what you get is essentially `exponential-backoff` style of delaying."
+   `(* ms (Math/pow multiplier retry))` delaying. If <multiplier> & <ms> are equal,
+   what you get is essentially `exponential-backoff` style of delaying.
+   The second one will give you the current delaying value,
+   given the current retrying attempt."
   [ms multiplier]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
@@ -32,43 +37,58 @@
                (not= 1 multiplier))
           "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `fixed-delay` for that effect)...")
 
-  (fn [retry]
-    (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-      (Thread/sleep
-        (* ms (Math/pow multiplier retry))))))
+  (let [calc #(long (* ms (Math/pow multiplier %)))]
+    [(fn [retry]
+       (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
+         (Thread/sleep (calc retry))))
+     calc]))
 
 (defn exponential-delay
-  "Returns a function which will block the current thread via `Thread/sleep`,
+  "Returns a vector of 2 functions. The first one will block the current thread via `Thread/sleep`,
    using exponential delaying. See `multiplicative-delay` for details."
   [ms]
   (multiplicative-delay ms ms))
 
 
 (defn additive-delay
-  "Returns a function which will block the current thread via `Thread/sleep`,
+  "Returns  a vector of 2 functions.
+   The first one will block the current thread via `Thread/sleep`,
    using fixed increments. This has addition semantics.
-   At each retry you will get `(+ current-ms fixed-increment)` delaying."
+   At each retry you will get `(+ current-ms fixed-increment)` delaying.
+   The second one will give you the current delaying value,
+   given the current retrying attempt."
   [ms fixed-increment]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
   (let [dlay-ms (AtomicLong. ms)]
-    (fn [_]
+    [(fn [_]
       (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
         (Thread/sleep
-          (.getAndAdd dlay-ms fixed-increment))))))
+          (.getAndAdd dlay-ms fixed-increment))))
+     (fn [_]
+       (.get dlay-ms))]))
 
 (defn fixed-delay
-  "Returns a function which will block the current thread via `Thread/sleep`
-   using fixed <ms> (positive amount of milliseconds)."
+  "Returns  a vector of 2 functions.
+   The first one will block the current thread via `Thread/sleep`
+   using fixed <ms> (positive amount of milliseconds).
+   The second one will always return <ms>."
   [ms]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
-  (fn [_]
+  [(fn [_]
     (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-      (Thread/sleep ms))))
+      (Thread/sleep ms)))
+   (constantly ms)])
 
+(defn default-log-fn
+  "Prints a message to stdout that an error happened and going to be retried."
+  [get-delay! attempt]
+  (println (format "Attempt #%s failed! Retrying in %s ms ..."
+                   (inc attempt)
+                   (get-delay! attempt))))
 
 
 ;;GENERIC - CONDITION FOCUSED (bottom level utility)
@@ -161,8 +181,8 @@
                  (catch-all ~exceptions ~'_e_
                             (if-let [pred# (:ex-pred ~opts)]
                               (or (pred# ~'_e_)
-                                  :ajenda.retrying/error)
-                              :ajenda.retrying/error)))))
+                                  ajenda.retrying/ERROR)
+                              ajenda.retrying/ERROR)))))
 
           opts (concat `[~opts])))
 
@@ -185,8 +205,8 @@
                  (catch-all ~exceptions ~'_e_  ;; not the most hygienic thing to do
                             (if-let [pred# (:ex-pred ~opts)]
                               (or (pred# ~'_e_) 
-                                  :ajenda.retrying/error)
-                              :ajenda.retrying/error)))))
+                                  ajenda.retrying/ERROR)
+                              ajenda.retrying/ERROR)))))
 
           opts (concat `[~opts])))
 
@@ -239,8 +259,8 @@
            (catch-all ~exceptions ~'_e_
                       (if-let [pred# (:ex-pred ~opts)]
                         (or (pred# ~'_e_)
-                            :ajenda.retrying/error)
-                        :ajenda.retrying/error))))
+                            ajenda.retrying/ERROR)
+                        ajenda.retrying/ERROR))))
        ~opts)))
 
 (defmacro with-max-error-retries-timeout
@@ -262,7 +282,7 @@
            (catch-all ~exceptions ~'_e_
                       (if-let [pred# (:ex-pred ~opts)]
                         (or (pred# ~'_e_)
-                            :ajenda.retrying/error)
-                        :ajenda.retrying/error))))
+                            ajenda.retrying/ERROR)
+                        ajenda.retrying/ERROR))))
        ~opts)))
 

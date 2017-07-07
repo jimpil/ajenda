@@ -136,12 +136,15 @@
     (.set check-box 0)
     (testing "delay-fn!"
       (testing "fixed-delay"
-        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
-                               :delay-fn! (fixed-delay 100)}
-                              1000
-                              nil
-                              (constantly false)
-                              (.getAndIncrement check-box))
+        (let [[do-delay! get-delay] (fixed-delay 100)]
+          (with-retries-timeout {:retry-fn! (fn [i]
+                                              (default-log-fn get-delay i)
+                                              (.getAndIncrement check-box))
+                                 :delay-fn! do-delay!}
+                                1000
+                                nil
+                                (constantly false)
+                                (.getAndIncrement check-box)))
 
         (is (= 20 (.get check-box))) ;; ended up doing 10 iterations due to the delay (1000 / 100 = 10)
         )
@@ -149,37 +152,45 @@
       (.set check-box 0)
 
       (testing "additive-delay"
-        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
-                               :delay-fn! (additive-delay 100 50)} ;; 100 => 150 => 200 => 250 ...
-                              1000
-                              nil
-                              (constantly false)
-                              (.getAndIncrement check-box))
+        (let [[do-delay! get-delay] (additive-delay 100 50)] ;; 100 => 150 => 200 => 250 ...
+          (with-retries-timeout {:retry-fn! (fn [i]
+                                              (default-log-fn get-delay i)
+                                              (.getAndIncrement check-box))
+                                 :delay-fn! do-delay!}
+                                1000
+                                nil
+                                (constantly false)
+                                (.getAndIncrement check-box)))
         ;; 100 + 150 + 200 + 250 + 300 = 1000
         (is (= 10 (.get check-box))) ;; there was not enough time for the 6th iteration
         )
 
       (.set check-box 0)
       (testing "increasing (10x) multiplicative-delay (aka exponential-backoff)"
-        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
-                               :delay-fn! (exponential-delay 10) ;; 10^1 - 10^N progression (ten-fold increase on each iteration)
-                               }
-                              1000
-                              nil
-                              (constantly false)
-                              (.getAndIncrement check-box))
+        (let [[do-delay! get-delay] (exponential-delay 10)] ;; 10^1 - 10^N progression (ten-fold increase on each iteration)
+          (with-retries-timeout {:retry-fn! (fn [i]
+                                              (default-log-fn get-delay i)
+                                              (.getAndIncrement check-box))
+                                 :delay-fn! do-delay!}
+                                1000
+                                nil
+                                (constantly false)
+                                (.getAndIncrement check-box)))
         ;; only 3 iterations fit in 1000 ms due to the (increasing) delays (10 => 100 => 1000)
         (is (= 6 (.get check-box)))
         )
 
       (.set check-box 0)
       (testing "decreasing (2x) multiplicative-delay"
-        (with-retries-timeout {:retry-fn! (fn [_] (.getAndIncrement check-box))
-                               :delay-fn! (multiplicative-delay 600 0.5)} ;; 2x decrease at each iteration
-                              1000
-                              nil
-                              (constantly false)
-                              (.getAndIncrement check-box))
+        (let [[do-delay! get-delay] (multiplicative-delay 600 0.5)]  ;; 2x decrease at each iteration
+          (with-retries-timeout {:retry-fn! (fn [i]
+                                              (default-log-fn get-delay i)
+                                              (.getAndIncrement check-box))
+                                 :delay-fn! do-delay!}
+                                1000
+                                nil
+                                (constantly false)
+                                (.getAndIncrement check-box)))
         ;; only 3 iterations fit in 1000 ms due to the (decreasing) delays (600 => 900 => 1050)
         (is (= 6 (.get check-box)))
         )
