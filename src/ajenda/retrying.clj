@@ -84,11 +84,15 @@
    (constantly ms)])
 
 (defn default-log-fn
-  "Prints a message to stdout that an error happened and going to be retried."
-  [get-delay! attempt]
-  (println (format "Attempt #%s failed! Retrying in %s ms ..."
-                   (inc attempt)
-                   (get-delay! attempt))))
+  "Prints a rudimentary message to stdout about the current retrying attempt,
+   and the (potential) upcoming delay."
+  ([attempt]
+   (default-log-fn (constantly 0) attempt))
+  ([get-delay attempt]
+  (println
+    (format "Attempt #%s failed! Retrying in %s ms ..."
+            (inc attempt)
+            (get-delay attempt)))))
 
 
 ;;GENERIC - CONDITION FOCUSED (bottom level utility)
@@ -103,7 +107,7 @@
    <opts> can be a map supporting the following options:
 
   :retry-fn!    A (presumably side-effecting) function of 1 argument (the current retrying attempt).
-                Logging can be implemented on top of this for example.
+                Logging can be implemented on top of this. See `default-log-fn` for an example.
 
   :delay-fn!    A delay producing function of 1 argument (the current retrying attempt).
                 See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."

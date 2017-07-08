@@ -50,16 +50,30 @@
 
 (deftest with-error-retries-tests
   (let [check-box (AtomicInteger. 0)]
+    (testing "`with-error-retries`"
+      ;; answer found on the 10th retry
+      (is (= :whatever
+             (with-error-retries nil [ArithmeticException IndexOutOfBoundsException]
+                (condp = (.getAndIncrement check-box)
+                  5 (throw (IndexOutOfBoundsException. ""))
+                  10 :whatever
+                  (throw (ArithmeticException. ""))))))
+      )
 
-    ;; answer found on the 10th retry
-    (is (= :whatever
-           (with-error-retries nil [ArithmeticException IndexOutOfBoundsException]
-             (condp = (.getAndIncrement check-box)
-               5 (throw (IndexOutOfBoundsException. ""))
-               10 :whatever
-               (throw (ArithmeticException. ""))))))
+
+    (.set check-box 0)
+    (testing "`:ex-pred` option"
+      (is (true?
+            (with-error-retries {:ex-pred (fn [e] (= "foo" (.getMessage e)))}
+                                [ArithmeticException IndexOutOfBoundsException]
+                                (condp = (.getAndIncrement check-box)
+                                  5 (throw (IndexOutOfBoundsException. "foo"))
+                                  10 :whatever
+                                  (throw (ArithmeticException. "bar"))))))
+
+      (is (= 6 (.get check-box))) ;; 5th attempt succeeded
+      )
     )
-
   )
 
 (deftest with-error-retries-timeout-tests
@@ -81,28 +95,30 @@
   )
 
 (deftest with-max-error-retries-tests
-  (let [check-box (AtomicInteger. 0)]
+  (testing "with-max-error-retries"
+    (let [check-box (AtomicInteger. 0)]
 
-    ;; max-retries elapsed - no answer
-    (is (nil?
-          (with-max-error-retries nil 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
-            (condp = (.getAndIncrement check-box)
-              0 (throw (ArithmeticException. ""))
-              1 (throw (IndexOutOfBoundsException. ""))
-              2 (throw (ex-info "" {}))
-              :whatever))))
+      ;; max-retries elapsed - no answer
+      (is (nil?
+            (with-max-error-retries {:retry-fn! default-log-fn} 3
+                                    [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
+                                    (condp = (.getAndIncrement check-box)
+                                      0 (throw (ArithmeticException. ""))
+                                      1 (throw (IndexOutOfBoundsException. ""))
+                                      2 (throw (ex-info "" {}))
+                                      :whatever))))
 
-    (.set check-box 0) ;reset it
+      (.set check-box 0) ;reset it
 
-    ;; found an answer before max-retries
-    (is (= :whatever
-           (with-max-error-retries nil 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
-             (condp = (.getAndIncrement check-box)
-               0 (throw (ArithmeticException. ""))
-               1 (throw (IndexOutOfBoundsException. ""))
-               2 :whatever
-               nil))))
-    )
+      ;; found an answer before max-retries
+      (is (= :whatever
+             (with-max-error-retries nil 3 [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
+                                     (condp = (.getAndIncrement check-box)
+                                       0 (throw (ArithmeticException. ""))
+                                       1 (throw (IndexOutOfBoundsException. ""))
+                                       2 :whatever
+                                       nil))))
+      ))
   )
 
 
