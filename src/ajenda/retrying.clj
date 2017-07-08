@@ -14,7 +14,7 @@
 (defonce ERROR ::error)
 
 (defn exception-success-condition
-  "Returns `(partial not= ::error)`."
+  "Returns `(partial not-identical? ::error)`."
   [exceptions]
   (assert (every? (partial instance? Class) exceptions))
   (partial ut/not-identical? ERROR)) ;; anything that doesn't throw one of <exceptions> succeeds
@@ -37,7 +37,8 @@
                (not= 1 multiplier))
           "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `fixed-delay` for that effect)...")
 
-  (let [calc #(long (* ms (Math/pow multiplier %)))]
+  (let [calc (fn [i]
+               (long (* ms (Math/pow multiplier i))))]
     [(fn [retry]
        (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
          (Thread/sleep (calc retry))))
@@ -56,16 +57,18 @@
    using fixed increments. This has addition semantics.
    At each retry you will get `(+ current-ms fixed-increment)` delaying.
    The second one will give you the current delaying value,
-   given the current retrying attempt."
+   regardless of what you pass an argument to it."
   [ms fixed-increment]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
-  (let [dlay-ms (AtomicLong. ms)]
+  (let [dlay-ms (AtomicLong. ms)
+        positive-increment? (pos? fixed-increment)]
     [(fn [_]
       (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-        (Thread/sleep
-          (.getAndAdd dlay-ms fixed-increment))))
+        (let [t (.getAndAdd dlay-ms fixed-increment)]
+          (when positive-increment? ;; need to be careful here :)
+            (Thread/sleep t)))))
      (fn [_]
        (.get dlay-ms))]))
 
@@ -135,6 +138,13 @@
            (if (done? res)
              res
              (do (retry!+delay! i)
+                 ;; What's the most sensible thing to do after Long/MAX_VALUE retries?
+                 ;; keep retrying with a bad counter, give up (i.e. throw), or keep retrying with
+                 ;; a good counter? I'd like to say that keep retrying is the right thing to do,
+                 ;; but at the same time I feel that auto-promoting (`inc'`)  would be an overkill here.
+                 ;; If someone retries something for that many times, chances are he doesn't care
+                 ;; about the number of attempts (e.g. timeout). So it seems `unchecked-inc` is the
+                 ;; best option here.
                  (recur (unchecked-inc i))))))))))
 
 (defmacro with-retries
