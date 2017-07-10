@@ -151,8 +151,8 @@
              (map mul-delay simulated-iterations)))
       (is (= [10 100 1000 10000 100000] ;; +1 exponent at each step
              (map exp-delay simulated-iterations)))
-      (is (= [10 20 30 10 20]
-             (map cycl-delay simulated-iterations)))
+      (is (= (take 100 (cycle [10 20 30]))
+             (map cycl-delay (range 100))))
 
 
 

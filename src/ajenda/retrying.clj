@@ -53,13 +53,22 @@
   (fn [i]
     (+ ms (* fixed-increment i))))
 
-
 (defn cyclic-delay
-  "Returns `(partial nth (cycle mss))`."
+  "Returns a fn with the same effect as `(partial nth (cycle mss))`."
   [mss]
   (assert (every? pos? mss)
           "Negative or zero delay is NOT allowed!")
-  (partial nth (cycle mss)))
+
+  (let [ceiling (count mss)
+        m (zipmap (range ceiling) mss)]
+    (fn [i] ;; O(1) implementation of `nth` for cycles
+      (let [remainder (rem i ceiling)]
+        (if (zero? remainder)
+          (m 0) ;; wrap around here
+          (m remainder)))))
+  ; O(n)
+  ;(partial nth (cycle mss))
+  )
 
 
 (defn oscillating-delay
