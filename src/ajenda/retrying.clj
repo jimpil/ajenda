@@ -62,6 +62,11 @@
   (partial nth (cycle mss)))
 
 
+(defn oscillating-delay
+  "Returns `(cyclic-delay [xms yms])`."
+  [xms yms]
+  (cyclic-delay [xms yms]))
+
 (defn fixed-delay
   "Returns `(constantly ms)`."
   [ms]
