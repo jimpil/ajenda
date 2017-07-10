@@ -141,6 +141,7 @@
         div-delay (multiplicative-delay 160 0.5)
         exp-delay (exponential-delay 10)
         cycl-delay (cyclic-delay [10 20 30])
+        osc-delay (oscillating-delay 10 50)
         simulated-iterations (range 5)]
 
     (testing "delaying strategies correctness"
@@ -153,6 +154,8 @@
              (map exp-delay simulated-iterations)))
       (is (= (take 100 (cycle [10 20 30]))
              (map cycl-delay (range 100))))
+      (is (= (take 100 (cycle [10 50]))
+             (map osc-delay (range 100))))
 
 
 
