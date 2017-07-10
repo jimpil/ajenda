@@ -75,9 +75,12 @@
 (defn default-delay-fn!
   "Blocks the thread via `(Thread/sleep ms)`."
   [ms]
-  ;; skip delaying if we've time-outed already!
-  (when-not (ut/thread-interrupted?)
-    (Thread/sleep ms)))
+  ;; need to be careful here as delaying strategies could be decreasing,
+  ;; and in some cases they will start return negative values (e.g. additive delay)
+  (when (pos? ms)
+    ;; don't try to call `.sleep` on an interrupted thread!
+    (when-not (ut/thread-interrupted?)
+      (Thread/sleep ms))))
 
 
 ;;GENERIC - CONDITION FOCUSED (bottom level utility)
@@ -98,7 +101,7 @@
                 The default is `default-delay-fn!`, but it won't be activated unless `:delay-calc` has been provided.
 
   :delay-calc   A function of 1 argument (the current retrying attempt), returning the amount of milliseconds.
-                This is expected to be a pure function, which can called more than once (e.g. in `:retry-fn!`).
+                This is expected to be a pure function, which can called more than once (e.g. by `:retry-fn!`).
                 See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
