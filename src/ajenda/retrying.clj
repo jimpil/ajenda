@@ -85,7 +85,7 @@
   "Blocks the thread via `(Thread/sleep ms)`."
   [ms]
   ;; need to be careful here as delaying strategies could be decreasing,
-  ;; and in some cases they will start return negative values (e.g. additive delay)
+  ;; and in some cases they might start return negative values (e.g. additive delay)
   (when (pos? ms)
     ;; don't try to call `.sleep` on an interrupted thread!
     (when-not (ut/thread-interrupted?)
