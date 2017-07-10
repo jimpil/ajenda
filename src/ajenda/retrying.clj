@@ -21,15 +21,11 @@
 
 
 (defn multiplicative-delay
-  "Returns a vector of 2 functions.
-   The first one will block the current thread via `Thread/sleep`
-   using increasing/decreasing <ms> (positive amount of milliseconds).
-   The rate of increase/decrease is controlled by <multiplier> (a positive number).
-   This has multiplication semantics. At each retry you will get
-   `(* ms (Math/pow multiplier retry))` delaying. If <multiplier> & <ms> are equal,
-   what you get is essentially `exponential-backoff` style of delaying.
-   The second one will give you the current delaying value,
-   given the current retrying attempt."
+  "Returns a function that will calculate the amount of delaying
+   given the current retrying attempt, with multiplication semantics.
+   At each retry you will get `(* ms (Math/pow multiplier retry))` delaying.
+   If <multiplier> & <ms> are equal, what you get is essentially
+   `exponential-backoff` style of delaying."
   [ms multiplier]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
@@ -41,19 +37,15 @@
     (long (* ms (Math/pow multiplier i)))))
 
 (defn exponential-delay
-  "Returns a vector of 2 functions. The first one will block the current thread via `Thread/sleep`,
-   using exponential delaying. See `multiplicative-delay` for details."
+  "A special case of `multiplicative-delay`."
   [ms]
   (multiplicative-delay ms ms))
 
 
 (defn additive-delay
-  "Returns  a vector of 2 functions.
-   The first one will block the current thread via `Thread/sleep`,
-   using fixed increments. This has addition semantics.
-   At each retry you will get `(+ current-ms fixed-increment)` delaying.
-   The second one will give you the current delaying value,
-   regardless of what you pass an argument to it."
+  "Returns a function that will calculate the amount of delaying
+   given the current retrying attempt, with addition semantics.
+   At each retry you will get `(+ ms (* fixed-increment i))` delaying."
   [ms fixed-increment]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
@@ -62,10 +54,7 @@
     (+ ms (* fixed-increment i))))
 
 (defn fixed-delay
-  "Returns  a vector of 2 functions.
-   The first one will block the current thread via `Thread/sleep`
-   using fixed <ms> (positive amount of milliseconds).
-   The second one will always return <ms>."
+  "Returns `(constantly ms)`."
   [ms]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
@@ -84,10 +73,11 @@
             (delay-calc attempt)))))
 
 (defn default-delay-fn!
-  [delay-ms]
+  "Blocks the thread via `(Thread/sleep ms)`."
+  [ms]
   ;; skip delaying if we've time-outed already!
   (when-not (ut/thread-interrupted?)
-    (Thread/sleep delay-ms)))
+    (Thread/sleep ms)))
 
 
 ;;GENERIC - CONDITION FOCUSED (bottom level utility)
@@ -104,11 +94,12 @@
   :retry-fn!    A (presumably side-effecting) function of 1 argument (the current retrying attempt).
                 Logging can be implemented on top of this. See `default-log-fn` for an example.
 
-  :delay-fn!    A delay producing function of 1 argument (the current retrying attempt).
+  :delay-fn!    A function of 1 argument (the number of milliseconds) which blocks the current thread.
+                The default is `default-delay-fn!`, but it won't be activated unless `:delay-calc` has been provided.
 
-  :delay-calc   A function of 1 argument (the current retrying attempt), returning the amount of milliseconds
-                to pass to `delay-fn!`. See `fixed-delay`, `additive-delay`, `multiplicative-delay`
-                & `exponential-delay` for examples."
+  :delay-calc   A function of 1 argument (the current retrying attempt), returning the amount of milliseconds.
+                This is expected to be a pure function, which can called more than once (e.g. in `:retry-fn!`).
+                See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
   ([retry? done? f opts]
