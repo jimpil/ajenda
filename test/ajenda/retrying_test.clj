@@ -134,6 +134,37 @@
     )
   )
 
+(deftest delaying-calc-tests
+  (let [add-delay (additive-delay 10 25)
+        sub-delay (additive-delay 110 -25)
+        mul-delay (multiplicative-delay 10 2)
+        div-delay (multiplicative-delay 160 0.5)
+        exp-delay (exponential-delay 10)
+        cycl-delay (cyclic-delay [10 20 30])
+        simulated-iterations (range 5)]
+
+    (testing "delaying strategies correctness"
+
+      (is (= [10 35 60 85 110] ;; +25 at each step
+             (map add-delay simulated-iterations)))
+      (is (= [10 20 40 80 160] ;; *2 at each step
+             (map mul-delay simulated-iterations)))
+      (is (= [10 100 1000 10000 100000] ;; +1 exponent at each step
+             (map exp-delay simulated-iterations)))
+      (is (= [10 20 30 10 20]
+             (map cycl-delay simulated-iterations)))
+
+
+
+      (is (= (reverse [10 35 60 85 110])  ;; -25 at each step
+             (map sub-delay simulated-iterations)))
+
+      (is (= (reverse [10 20 40 80 160]) ;; /2 at each step
+             (map div-delay simulated-iterations)))
+      )
+    )
+  )
+
 
 (deftest retrying-options-tests
   (let [check-box (AtomicInteger. 0)]
@@ -210,6 +241,24 @@
         ;; only 3 iterations fit in 1000 ms due to the (decreasing) delays (600 => 900 => 1050)
         (is (= 6 (.get check-box)))
         )
+      (.set check-box 0)
+
+      (testing "cyclic-delay"
+        (let [delay-algo (cyclic-delay [100 200 300])]
+          (with-retries-timeout {:retry-fn! (fn [i]
+                                              (default-log-fn delay-algo i)
+                                              (.getAndIncrement check-box))
+                                 :delay-calc delay-algo}
+                                1000
+                                nil
+                                (constantly false)
+                                (.getAndIncrement check-box))
+          ;; only 6 iterations fit in 1000 ms due to the (cycling) delays (100 + 200 + 300 + 100 + 200 = 900)
+          (is (= 12 (.get check-box)))
+          )
+
+        )
+
       )
     )
 

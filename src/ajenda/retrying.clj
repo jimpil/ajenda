@@ -53,6 +53,15 @@
   (fn [i]
     (+ ms (* fixed-increment i))))
 
+
+(defn cyclic-delay
+  "Returns `(partial nth (cycle mss))`."
+  [mss]
+  (assert (every? pos? mss)
+          "Negative or zero delay is NOT allowed!")
+  (partial nth (cycle mss)))
+
+
 (defn fixed-delay
   "Returns `(constantly ms)`."
   [ms]
