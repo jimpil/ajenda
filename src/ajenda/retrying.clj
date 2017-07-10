@@ -62,12 +62,12 @@
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
-  (let [dlay-ms (AtomicLong. ms)
-        positive-increment? (pos? fixed-increment)]
+  (let [dlay-ms (AtomicLong. ms)]
     [(fn [_]
       (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
         (let [t (.getAndAdd dlay-ms fixed-increment)]
-          (when positive-increment? ;; need to be careful here :)
+          ;; need to be careful here because of the possibility of a negative fixed-increment
+          (when (pos? t)
             (Thread/sleep t)))))
      (fn [_]
        (.get dlay-ms))]))
