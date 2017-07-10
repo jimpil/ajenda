@@ -1,14 +1,13 @@
 (ns ajenda.retrying
   (:require [ajenda.expiring :as schedule]
-            [ajenda.utils :as ut])
-  (:import (java.util.concurrent.atomic AtomicLong)))
+            [ajenda.utils :as ut]))
 
 (defn max-retries-limiter
   "Returns `(partial > max-retries)`."
   [max-retries]
   (assert (and (integer? max-retries)
                (pos? max-retries))
-          "Negative or zero <max-retries> is not allowed!")
+          "Positive integer is required for <max-retries>.")
   (partial > max-retries))
 
 (defonce ERROR ::error)
@@ -16,7 +15,8 @@
 (defn exception-success-condition
   "Returns `(partial not-identical? ::error)`."
   [exceptions]
-  (assert (every? (partial instance? Class) exceptions))
+  (assert (every? (partial instance? Class) exceptions)
+          "Exception classes are required for <exceptions>.")
   (partial ut/not-identical? ERROR)) ;; anything that doesn't throw one of <exceptions> succeeds
 
 
@@ -87,7 +87,7 @@
   ;; need to be careful here as delaying strategies could be decreasing,
   ;; and in some cases they might start return negative values (e.g. additive delay)
   (when (pos? ms)
-    ;; don't try to call `.sleep` on an interrupted thread!
+    ;; NEVER attempt to call `.sleep()` on an interrupted thread!
     (when-not (ut/thread-interrupted?)
       (Thread/sleep ms))))
 
