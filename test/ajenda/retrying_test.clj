@@ -152,11 +152,11 @@
     (.set check-box 0)
     (testing "delay-fn!"
       (testing "fixed-delay"
-        (let [[do-delay! get-delay] (fixed-delay 100)]
+        (let [delay-algo (fixed-delay 100)]
           (with-retries-timeout {:retry-fn! (fn [i]
-                                              (default-log-fn get-delay i)
+                                              (default-log-fn delay-algo i)
                                               (.getAndIncrement check-box))
-                                 :delay-fn! do-delay!}
+                                 :delay-calc delay-algo}
                                 1000
                                 nil
                                 (constantly false)
@@ -168,11 +168,11 @@
       (.set check-box 0)
 
       (testing "additive-delay"
-        (let [[do-delay! get-delay] (additive-delay 100 50)] ;; 100 => 150 => 200 => 250 ...
+        (let [delay-algo (additive-delay 100 50)] ;; 100 => 150 => 200 => 250 ...
           (with-retries-timeout {:retry-fn! (fn [i]
-                                              (default-log-fn get-delay i)
+                                              (default-log-fn delay-algo i)
                                               (.getAndIncrement check-box))
-                                 :delay-fn! do-delay!}
+                                 :delay-calc delay-algo}
                                 1000
                                 nil
                                 (constantly false)
@@ -183,11 +183,11 @@
 
       (.set check-box 0)
       (testing "increasing (10x) multiplicative-delay (aka exponential-backoff)"
-        (let [[do-delay! get-delay] (exponential-delay 10)] ;; 10^1 - 10^N progression (ten-fold increase on each iteration)
+        (let [delay-algo (exponential-delay 10)] ;; 10^1 - 10^N progression (ten-fold increase on each iteration)
           (with-retries-timeout {:retry-fn! (fn [i]
-                                              (default-log-fn get-delay i)
+                                              (default-log-fn delay-algo i)
                                               (.getAndIncrement check-box))
-                                 :delay-fn! do-delay!}
+                                 :delay-calc delay-algo}
                                 1000
                                 nil
                                 (constantly false)
@@ -198,11 +198,11 @@
 
       (.set check-box 0)
       (testing "decreasing (2x) multiplicative-delay"
-        (let [[do-delay! get-delay] (multiplicative-delay 600 0.5)]  ;; 2x decrease at each iteration
+        (let [delay-algo (multiplicative-delay 600 0.5)]  ;; 2x decrease at each iteration
           (with-retries-timeout {:retry-fn! (fn [i]
-                                              (default-log-fn get-delay i)
+                                              (default-log-fn delay-algo i)
                                               (.getAndIncrement check-box))
-                                 :delay-fn! do-delay!}
+                                 :delay-calc delay-algo}
                                 1000
                                 nil
                                 (constantly false)

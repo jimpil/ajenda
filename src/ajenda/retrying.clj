@@ -37,12 +37,8 @@
                (not= 1 multiplier))
           "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `fixed-delay` for that effect)...")
 
-  (let [calc (fn [i]
-               (long (* ms (Math/pow multiplier i))))]
-    [(fn [retry]
-       (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-         (Thread/sleep (calc retry))))
-     calc]))
+  (fn [i]
+    (long (* ms (Math/pow multiplier i)))))
 
 (defn exponential-delay
   "Returns a vector of 2 functions. The first one will block the current thread via `Thread/sleep`,
@@ -62,15 +58,8 @@
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
-  (let [dlay-ms (AtomicLong. ms)]
-    [(fn [_]
-      (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-        (let [t (.getAndAdd dlay-ms fixed-increment)]
-          ;; need to be careful here because of the possibility of a negative fixed-increment
-          (when (pos? t)
-            (Thread/sleep t)))))
-     (fn [_]
-       (.get dlay-ms))]))
+  (fn [i]
+    (+ ms (* fixed-increment i))))
 
 (defn fixed-delay
   "Returns  a vector of 2 functions.
@@ -81,21 +70,24 @@
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
-  [(fn [_]
-    (when-not (ut/thread-interrupted?) ;; skip delaying if we've time-outed already!
-      (Thread/sleep ms)))
-   (constantly ms)])
+  (constantly ms))
 
 (defn default-log-fn
   "Prints a rudimentary message to stdout about the current retrying attempt,
    and the (potential) upcoming delay."
   ([attempt]
    (default-log-fn (constantly 0) attempt))
-  ([get-delay attempt]
+  ([delay-calc attempt]
   (println
     (format "Attempt #%s failed! Retrying in %s ms ..."
             (inc attempt)
-            (get-delay attempt)))))
+            (delay-calc attempt)))))
+
+(defn default-delay-fn!
+  [delay-ms]
+  ;; skip delaying if we've time-outed already!
+  (when-not (ut/thread-interrupted?)
+    (Thread/sleep delay-ms)))
 
 
 ;;GENERIC - CONDITION FOCUSED (bottom level utility)
@@ -113,24 +105,28 @@
                 Logging can be implemented on top of this. See `default-log-fn` for an example.
 
   :delay-fn!    A delay producing function of 1 argument (the current retrying attempt).
-                See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."
+
+  :delay-calc   A function of 1 argument (the current retrying attempt), returning the amount of milliseconds
+                to pass to `delay-fn!`. See `fixed-delay`, `additive-delay`, `multiplicative-delay`
+                & `exponential-delay` for examples."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
   ([retry? done? f opts]
-   (let [{:keys [retry-fn! delay-fn!]} opts
+   (let [{:keys [retry-fn! delay-fn! delay-calc]
+          :or {delay-fn! default-delay-fn!}} opts
          retry!+delay! (if (fn? retry-fn!)
-                         (if (fn? delay-fn!)
+                         (if (fn? delay-calc)
                            (fn [i]
                              ;; do both
                              (retry-fn! i)
-                             (delay-fn! i))
+                             (delay-fn! (delay-calc i)))
                            (fn [i]
                              ;; only retry
                              (retry-fn! i)))
-                         (if (fn? delay-fn!)
+                         (if (fn? delay-calc)
                            (fn [i]
                              ;;only delay
-                             (delay-fn! i))
+                             (delay-fn! (delay-calc i)))
                            ut/do-nothing))]
      (loop [i 0]
        (when (retry? i)
