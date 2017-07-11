@@ -180,7 +180,9 @@
                         (constantly false)
                         (.getAndIncrement check-box))
 
-      (is (= 22 (.get check-box))) ;; got incremented twice per iteration (1 attempt + 10 retries)
+      ;; got incremented twice per iteration (1 attempt + 10 retries)
+      ;; `retry-fn` was NOT called in the very last iteration (hence 21 instead of 22)
+      (is (= 21 (.get check-box)))
 
       )
 

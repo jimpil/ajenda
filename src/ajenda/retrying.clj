@@ -115,7 +115,8 @@
    <opts> can be a map supporting the following options:
 
   :retry-fn!    A (presumably side-effecting) function of 1 argument (the current retrying attempt).
-                Runs after each attempt, so on very first attempt it will see `0`. Retries count from 1 after that.
+                Runs after each attempt apart from the last one, so on very first attempt it will see `0`.
+                Retries count from 1 after that.
                 Logging can be implemented on top of this. See `default-log-fn` for an example.
 
   :delay-fn!    A function of 1 argument (the number of milliseconds) which blocks the current thread.
@@ -144,12 +145,19 @@
                              ;;only delay
                              (delay-fn! (delay-calc i)))
                            ut/do-nothing))]
-     (loop [i 0]
-       (when (retry? i)
-         (let [res (f)]
+     (loop [i 0
+            retry-now? (retry? i)]
+       (when retry-now?
+         (let [res (f)
+               next-i (unchecked-inc i)
+               retry-next? (retry? next-i)]
            (if (done? res)
              res
-             (do (retry!+delay! i)
+             (do (when retry-next?
+                   ;; clever optimisation which looks one step ahead and skips the final retries/delays
+                   ;; this enables using 0 as the number of max-retries and no retries/delays will happen
+                   ;; as if this code evaporated.
+                   (retry!+delay! i))
                  ;; What's the most sensible thing to do after Long/MAX_VALUE retries?
                  ;; keep retrying with a bad counter, give up (i.e. throw), or keep retrying with
                  ;; a good counter? I'd like to say that keep retrying is the right thing to do,
@@ -157,7 +165,7 @@
                  ;; If someone retries something for that many times, chances are he doesn't care
                  ;; about the number of attempts (e.g. timeout). So it seems `unchecked-inc` is the
                  ;; best option here.
-                 (recur (unchecked-inc i))))))))))
+                 (recur next-i retry-next?)))))))))
 
 (defmacro with-retries
   "Retries <body> until <condition> returns a truthy value.
