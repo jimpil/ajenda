@@ -6,9 +6,9 @@
   "Returns `(partial > max-retries)`."
   [max-retries]
   (assert (and (integer? max-retries)
-               (pos? max-retries))
-          "Positive integer is required for <max-retries>.")
-  (partial > max-retries))
+               (not (neg? max-retries)))
+          "Non-negative integer is required for <max-retries>.")
+  (partial >= max-retries))
 
 (defonce ERROR ::error)
 
@@ -62,10 +62,7 @@
   (let [ceiling (count mss)
         m (zipmap (range ceiling) mss)]
     (fn [i] ;; O(1) implementation of `nth` for cycles
-      (let [remainder (rem i ceiling)]
-        (if (zero? remainder)
-          (m 0) ;; wrap around here
-          (m remainder)))))
+      (m (rem i ceiling))))
   ; O(n)
   ;(partial nth (cycle mss))
   )

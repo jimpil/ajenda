@@ -9,7 +9,7 @@
 
     ;; limit reached - no result - return nil
     (is (nil? (with-max-retries nil 10 nil? (.incrementAndGet check-box))))
-    (is (= 10 (.get check-box)))
+    (is (= 11 (.get check-box)))
 
     ;; returns result
     (is (= 15 (with-max-retries nil 6 (partial = 15) (.incrementAndGet check-box))))
@@ -105,7 +105,8 @@
                                     (condp = (.getAndIncrement check-box)
                                       0 (throw (ArithmeticException. ""))
                                       1 (throw (IndexOutOfBoundsException. ""))
-                                      2 (throw (ex-info "" {}))
+                                      2 (throw (ex-info "foo" {}))
+                                      3 (throw (ex-info "bar" {}))
                                       :whatever))))
 
       (.set check-box 0) ;reset it
@@ -179,7 +180,7 @@
                         (constantly false)
                         (.getAndIncrement check-box))
 
-      (is (= 20 (.get check-box))) ;; got incremented twice per iteration
+      (is (= 22 (.get check-box))) ;; got incremented twice per iteration (1 attempt + 10 retries)
 
       )
 
