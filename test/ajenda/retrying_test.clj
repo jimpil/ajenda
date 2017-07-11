@@ -143,7 +143,7 @@
         exp-delay (exponential-delay 10)
         cycl-delay (cyclic-delay [10 20 30])
         osc-delay (oscillating-delay 10 50)
-        simulated-iterations (range 5)]
+        simulated-iterations (range 1 6)]
 
     (testing "delaying strategies correctness"
 
@@ -229,7 +229,7 @@
                                 nil
                                 (constantly false)
                                 (.getAndIncrement check-box)))
-        ;; only 3 iterations fit in 1000 ms due to the (increasing) delays (10 => 100 => 1000)
+        ;; only 2 retries fit in 1000 ms due to the (increasing) delays (10 => 100 => 1000)
         (is (= 6 (.get check-box)))
         )
 
@@ -259,8 +259,8 @@
                                 nil
                                 (constantly false)
                                 (.getAndIncrement check-box))
-          ;; only 6 iterations fit in 1000 ms due to the (cycling) delays (100 + 200 + 300 + 100 + 200 = 900)
-          (is (= 12 (.get check-box)))
+          ;; only 5 retries fit in 1000 ms due to the (cycling) delays (100 + 200 + 300 + 100 + 200 = 900)
+          (is (= 10 (.get check-box)))
           )
 
         )

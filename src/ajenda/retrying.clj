@@ -34,7 +34,7 @@
           "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `fixed-delay` for that effect)...")
 
   (fn [i]
-    (long (* ms (Math/pow multiplier i)))))
+    (long (* ms (Math/pow multiplier (unchecked-dec i))))))
 
 (defn exponential-delay
   "A special case of `multiplicative-delay`."
@@ -45,13 +45,13 @@
 (defn additive-delay
   "Returns a function that will calculate the amount of delaying
    given the current retrying attempt, with addition semantics.
-   At each retry you will get `(+ ms (* fixed-increment i))` delaying."
+   At each retry you will get `(+ ms (* fixed-increment (dec i)))` delaying."
   [ms fixed-increment]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
 
   (fn [i]
-    (+ ms (* fixed-increment i))))
+    (+ ms (* fixed-increment (unchecked-dec i)))))
 
 (defn cyclic-delay
   "Returns a fn with the same effect as `(partial nth (cycle mss))`."
@@ -86,11 +86,11 @@
    and the (potential) upcoming delay."
   ([attempt]
    (default-log-fn (constantly 0) attempt))
-  ([delay-calc attempt]
+  ([delay-calc retry-attempt]
   (println
     (format "Attempt #%s failed! Retrying in %s ms ..."
-            (inc attempt)
-            (delay-calc attempt)))))
+            retry-attempt
+            (delay-calc retry-attempt)))))
 
 (defn default-delay-fn!
   "Blocks the thread via `(Thread/sleep ms)`."
@@ -115,8 +115,8 @@
    <opts> can be a map supporting the following options:
 
   :retry-fn!    A (presumably side-effecting) function of 1 argument (the current retrying attempt).
-                Runs after each attempt apart from the last one, so on very first attempt it will see `0`.
-                Retries count from 1 after that.
+                Runs after the first attempt, and before each retry apart from the very last one.
+                As such, this fn will never see `0` because it always refers to the upcoming retry.
                 Logging can be implemented on top of this. See `default-log-fn` for an example.
 
   :delay-fn!    A function of 1 argument (the number of milliseconds) which blocks the current thread.
@@ -157,7 +157,7 @@
                    ;; clever optimisation which looks one step ahead and skips the final retries/delays
                    ;; this enables using 0 as the number of max-retries and no retries/delays will happen
                    ;; as if this code evaporated.
-                   (retry!+delay! i))
+                   (retry!+delay! next-i))
                  ;; What's the most sensible thing to do after Long/MAX_VALUE retries?
                  ;; keep retrying with a bad counter, give up (i.e. throw), or keep retrying with
                  ;; a good counter? I'd like to say that keep retrying is the right thing to do,
