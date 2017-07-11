@@ -34,6 +34,9 @@
           "Negative or zero <multiplier> is NOT allowed! Neither is `1` (see `fixed-delay` for that effect)...")
 
   (fn [i]
+    ;; each delay blocks the next retry, so <i> will never be 0.
+    ;; however in order to calculate it correctly we must take
+    ;; into account the very first attempt too (hence need to decrement <i>)
     (long (* ms (Math/pow multiplier (unchecked-dec i))))))
 
 (defn exponential-delay
@@ -51,6 +54,9 @@
           "Negative or zero <ms> is NOT allowed!")
 
   (fn [i]
+    ;; each delay blocks the next retry, so <i> will never be 0.
+    ;; however in order to calculate it correctly we must take
+    ;; into account the very first attempt too (hence need to decrement <i>)
     (+ ms (* fixed-increment (unchecked-dec i)))))
 
 (defn cyclic-delay
@@ -62,6 +68,7 @@
   (let [ceiling (count mss)
         m (zipmap (range ceiling) mss)]
     (fn [i] ;; O(1) implementation of `nth` for cycles
+      ;; no need to do decrement <i> here because `(= 0 (rem x x))`
       (m (rem i ceiling))))
   ; O(n)
   ;(partial nth (cycle mss))
@@ -78,14 +85,13 @@
   [ms]
   (assert (pos? ms)
           "Negative or zero <ms> is NOT allowed!")
-
   (constantly ms))
 
 (defn default-log-fn
   "Prints a rudimentary message to stdout about the current retrying attempt,
    and the (potential) upcoming delay."
-  ([attempt]
-   (default-log-fn (constantly 0) attempt))
+  ([retry-attempt]
+   (default-log-fn (constantly 0) retry-attempt))
   ([delay-calc retry-attempt]
   (println
     (format "Attempt #%s failed! Retrying in %s ms ..."
@@ -109,7 +115,7 @@
 (defn with-retries*
   "Retries <f> (a fn of no args) until either <done?> (a fn of 1 arg: the result of `(f)`)
    returns a truthy value, in which case  the result of `(f)` is returned,
-   or <retry?> (a fn of 1 arg - the current retry number) returns nil/false,
+   or <try?> (a fn of 1 arg - the current attempt number) returns nil/false,
    in which case nil is returned.
 
    <opts> can be a map supporting the following options:
@@ -128,7 +134,7 @@
                 See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
-  ([retry? done? f opts]
+  ([try? done? f opts]
    (let [{:keys [retry-fn! delay-fn! delay-calc]
           :or {delay-fn! default-delay-fn!}} opts
          retry!+delay! (if (fn? retry-fn!)
@@ -146,17 +152,16 @@
                              (delay-fn! (delay-calc i)))
                            ut/do-nothing))]
      (loop [i 0
-            retry-now? (retry? i)]
-       (when retry-now?
+            try-now? (try? i)]
+       (when try-now?
          (let [res (f)
                next-i (unchecked-inc i)
-               retry-next? (retry? next-i)]
+               try-next? (try? next-i)]
            (if (done? res)
              res
-             (do (when retry-next?
+             (do (when try-next?
                    ;; clever optimisation which looks one step ahead and skips the final retries/delays
                    ;; this enables using 0 as the number of max-retries and no retries/delays will happen
-                   ;; as if this code evaporated.
                    (retry!+delay! next-i))
                  ;; What's the most sensible thing to do after Long/MAX_VALUE retries?
                  ;; keep retrying with a bad counter, give up (i.e. throw), or keep retrying with
@@ -165,7 +170,7 @@
                  ;; If someone retries something for that many times, chances are he doesn't care
                  ;; about the number of attempts (e.g. timeout). So it seems `unchecked-inc` is the
                  ;; best option here.
-                 (recur next-i retry-next?)))))))))
+                 (recur next-i try-next?)))))))))
 
 (defmacro with-retries
   "Retries <body> until <condition> returns a truthy value.

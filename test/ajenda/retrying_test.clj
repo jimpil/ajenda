@@ -229,7 +229,7 @@
                                 nil
                                 (constantly false)
                                 (.getAndIncrement check-box)))
-        ;; only 2 retries fit in 1000 ms due to the (increasing) delays (10 => 100 => 1000)
+        ;; only attempts fit in 1000 ms due to the (increasing) delays between the 2 retries (10 => 100 => 1000)
         (is (= 6 (.get check-box)))
         )
 
@@ -244,7 +244,7 @@
                                 nil
                                 (constantly false)
                                 (.getAndIncrement check-box)))
-        ;; only 3 iterations fit in 1000 ms due to the (decreasing) delays (600 => 900 => 1050)
+        ;; only 3 attempts fit in 1000 ms due to the (decreasing) delays between the 2 retries (600 => 900 => 1050)
         (is (= 6 (.get check-box)))
         )
       (.set check-box 0)
@@ -259,7 +259,7 @@
                                 nil
                                 (constantly false)
                                 (.getAndIncrement check-box))
-          ;; only 5 retries fit in 1000 ms due to the (cycling) delays (100 + 200 + 300 + 100 + 200 = 900)
+          ;; only 5 attempts fit in 1000 ms due to the (cycling) delays between the 4 retries (100 + 200 + 300 + 100 + 200 = 900)
           (is (= 10 (.get check-box)))
           )
 
