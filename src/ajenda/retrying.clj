@@ -115,10 +115,12 @@
    <opts> can be a map supporting the following options:
 
   :retry-fn!    A (presumably side-effecting) function of 1 argument (the current retrying attempt).
+                Runs after each attempt, so on very first attempt it will see `0`. Retries count from 1 after that.
                 Logging can be implemented on top of this. See `default-log-fn` for an example.
 
   :delay-fn!    A function of 1 argument (the number of milliseconds) which blocks the current thread.
-                The default is `default-delay-fn!`, but it won't be activated unless `:delay-calc` has been provided.
+                The default is `default-delay-fn!`, and it should suffice for the vast majority of use-cases.
+                Runs only if `:delay-calc` has been provided.
 
   :delay-calc   A function of 1 argument (the current retrying attempt), returning the amount of milliseconds.
                 This is expected to be a pure function, which can called more than once (e.g. by `:retry-fn!`).
