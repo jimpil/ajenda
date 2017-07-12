@@ -3,7 +3,7 @@
             [ajenda.utils :as ut]))
 
 (defn max-retries-limiter
-  "Returns `(partial > max-retries)`."
+  "Returns `(partial >= max-retries)`."
   [max-retries]
   (assert (and (integer? max-retries)
                (not (neg? max-retries)))
@@ -94,7 +94,8 @@
    (default-log-fn (constantly 0) retry-attempt))
   ([delay-calc retry-attempt]
   (println
-    (format "Attempt #%s failed! Retrying in %s ms ..."
+    (format "Attempt #%s failed! Retrying [%s] in %s ms ..."
+            (unchecked-dec retry-attempt)
             retry-attempt
             (delay-calc retry-attempt)))))
 
