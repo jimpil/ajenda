@@ -153,7 +153,7 @@
                              (delay-fn! (delay-calc i)))
                            ut/do-nothing))]
      (loop [i 0
-            try-now? (try? i)]
+            try-now? true] ;; start with `true` - first attempt should always happen
        (when try-now?
          (let [res (f)
                next-i (unchecked-inc i)
