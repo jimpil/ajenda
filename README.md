@@ -20,7 +20,18 @@ Example:
 Hi!
 Hi!
 Hi!
-=> nil
+=> ExceptionInfo Retries exhausted!  clojure.core/ex-info (core.clj:4739)
+
+;; the same as above but with try/catch so we can see the ex-data
+(try (with-max-retries nil 3 some?
+                  (println "Hi!"))
+     (catch Exception e (ex-data e)))
+Hi!
+Hi!
+Hi!
+Hi!
+=> {:retried 3, :last-result nil}
+
 
 (with-max-retries nil 3 nil? 
   (println "Hi!"))
