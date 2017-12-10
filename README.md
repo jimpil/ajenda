@@ -9,34 +9,34 @@ Clojure utility functions for scheduling side effects. The focus is on retrying,
 
 `ajenda.retrying` exposes 4 macros:
 
-1. *with-max-retries* [max-retries condition & body]
+1. *with-max-retries* [options max-retries condition & body]
 Repeatedly executes `<body>` until either it returns a satisfactory result (via `<condition>`), or `<max-retries>` has been reached.
 
 Example:
 
 ```clj
-(with-max-retries 3 some? 
+(with-max-retries nil 3 some? 
   (println "Hi!"))
 Hi!
 Hi!
 Hi!
 => nil
 
-(with-max-retries 3 nil? 
+(with-max-retries nil 3 nil? 
   (println "Hi!"))
 Hi!
 => nil
 ```
 
 
-2. *with-retries* [condition & body]
+2. *with-retries* [options condition & body]
 Repeatedly executes `<body>` until it returns a satisfactory result (via `<condition>`).
 
 Example:
 
 ```clj
 (let [state (atom 0)]
-  (with-retries (partial = 5) 
+  (with-retries nil (partial = 5) 
     (println "Hi!")
     (swap! state inc)))
 Hi!
@@ -49,19 +49,19 @@ Hi!
 ;; INFINITE LOOP - BE CAREFUL WITH THIS! 
 ;; SEE `with-retries-timeout` BELOW FOR A SAFER ALTERNATIVE.
 
-(with-retries some? 
+(with-retries nil some? 
   (println "Hi!"))
   
 ```
 
-3. *with-retries-timeout* [timeout-ms timeout-res condition & body]
+3. *with-retries-timeout* [options timeout-ms timeout-res condition & body]
 Repeatedly executes `<body>` until either it returns a satisfactory result (via `<condition>`), or `<timeout-ms>` has elapsed, 
 in which case `<timeout-res>` is returned.
 
 Example:
 
 ```clj
-(with-retries-timeout 10 :END some?   ;; stop retrying after 10 millis
+(with-retries-timeout nil 10 :END some?   ;; stop retrying after 10 millis
   (println "Hi!"))
 Hi!
 Hi!
@@ -73,21 +73,21 @@ Hi!
 ```
 
 
-4. *with-max-retries-timeout* [timeout timeout-res max-retries condition & body]
+4. *with-max-retries-timeout* [options timeout timeout-res max-retries condition & body]
 Repeatedly executes `<body>` until either it returns a satisfactory result (via `<condition>`), or `<max-retries>` has been reached, 
 or `<timeout-ms>` has elapsed, in which case `<timeout-res>` is returned.
 
 
 ```clj
 ;; stop retrying after 10 millis, OR after 5 retries
-(with-max-retries-timeout 10 :END 5 some? 
+(with-max-retries-timeout nil 10 :END 5 some? 
   (println "Hi!"))
 Hi!
 Hi!
 Hi!
 Hi!
 Hi!
-=> nil
+=> ExceptionInfo Retries exhausted! clojure.core/ex-info (core.clj:4739)
 
 ```
 

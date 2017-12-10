@@ -59,8 +59,3 @@
     `(try ~@body
           ~@(mapcat catch-all-guard catches))))
 
-(defonce do-nothing
-  (constantly nil))
-
-(def not-identical?
-  (complement identical?))

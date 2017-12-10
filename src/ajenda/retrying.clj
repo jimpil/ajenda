@@ -2,6 +2,28 @@
   (:require [ajenda.expiring :as schedule]
             [ajenda.utils :as ut]))
 
+(defn retryable-error
+  [cause]
+  (ex-info "Retryable error" {:retry? true} cause))
+
+(defn retryable-error?
+  [x]
+  (some-> x ex-data :retry?))
+
+(defmacro handle-error
+  "Helper for handling (potentially retryable) errors."
+  [e opts]
+  `(let [e# ~e]
+     (if-let [pred# (:halt-on ~opts)]
+       (if (pred# e#)
+         ;; If :halt-on returns truthy we don't want to retry
+         ;; so we throw something non-retryable
+         (throw e#)
+         ;; Otherwise we indicate we want to retry
+         (retryable-error e#))
+       ;; Always retry if :halt-on not specified
+       (retryable-error e#))))
+
 (defn max-retries-limiter
   "Returns `(partial >= max-retries)`."
   [max-retries]
@@ -10,16 +32,13 @@
           "Non-negative integer is required for <max-retries>.")
   (partial >= max-retries))
 
-(defonce ERROR ::error)
+(def exception-success-condition
+  "Returns `(complement retryable-error?)`."
+  ;; success predicate - done if not retryable
+  (complement retryable-error?))
 
-(defn exception-success-condition
-  "Returns `(partial not-identical? ::error)`."
-  [exceptions]
-  (assert (every? (partial instance? Class) exceptions)
-          "Exception classes are required for <exceptions>.")
-  (partial ut/not-identical? ERROR)) ;; anything that doesn't throw one of <exceptions> succeeds
-
-
+;;DELAYING STRATEGIES
+;;===================
 (defn multiplicative-delay
   "Returns a function that will calculate the amount of delaying
    given the current retrying attempt, with multiplication semantics.
@@ -104,11 +123,13 @@
   [ms]
   ;; need to be careful here as delaying strategies could be decreasing,
   ;; and in some cases they might start return negative values (e.g. additive delay)
-  (when (pos? ms)
-    ;; NEVER attempt to call `.sleep()` on an interrupted thread!
-    (when-not (ut/thread-interrupted?)
-      (Thread/sleep ms))))
+  (when (and (pos? ms)
+             ;; NEVER attempt to call `.sleep()` on an interrupted thread!
+             (not (ut/thread-interrupted?)))
+    (Thread/sleep ms)))
 
+(defonce do-nothing
+  (constantly nil))
 
 ;;GENERIC - CONDITION FOCUSED (bottom level utility)
 ;;=================================================
@@ -135,7 +156,7 @@
                 See `fixed-delay`, `additive-delay`, `multiplicative-delay` & `exponential-delay` for examples."
   ([retry? done? f]
    (with-retries* retry? done? f nil))
-  ([try? done? f opts]
+  ([retry? done? f opts]
    (let [{:keys [retry-fn! delay-fn! delay-calc]
           :or {delay-fn! default-delay-fn!}} opts
          retry!+delay! (if (fn? retry-fn!)
@@ -151,27 +172,33 @@
                            (fn [i]
                              ;;only delay
                              (delay-fn! (delay-calc i)))
-                           ut/do-nothing))]
-     (loop [i 0
-            try-now? true] ;; start with `true` - first attempt should always happen
-       (when try-now?
-         (let [res (f)
-               next-i (unchecked-inc i)
-               try-next? (try? next-i)]
-           (if (done? res)
-             res
-             (do (when try-next?
-                   ;; clever optimisation which looks one step ahead and skips the final retries/delays
-                   ;; this enables using 0 as the number of max-retries and no retries/delays will happen
-                   (retry!+delay! next-i))
-                 ;; What's the most sensible thing to do after Long/MAX_VALUE retries?
-                 ;; keep retrying with a bad counter, give up (i.e. throw), or keep retrying with
-                 ;; a good counter? I'd like to say that keep retrying is the right thing to do,
-                 ;; but at the same time I feel that auto-promoting (`inc'`)  would be an overkill here.
-                 ;; If someone retries something for that many times, chances are he doesn't care
-                 ;; about the number of attempts (e.g. timeout). So it seems `unchecked-inc` is the
-                 ;; best option here.
-                 (recur next-i try-next?)))))))))
+                           do-nothing))]
+     (loop [i 0 ;; start from 0 - the very first attempt is not a retry!
+            res (f)]
+       (if (done? res)
+         res
+         ;; What's the most sensible thing to do after Long/MAX_VALUE retries?
+         ;; keep retrying with a bad counter, give up (i.e. throw), or keep retrying with
+         ;; a good counter? I'd like to say that keep retrying is the right thing to do,
+         ;; but at the same time I feel that auto-promoting (`inc'`)  would be an overkill here.
+         ;; If someone retries something for that many times, chances are he doesn't care
+         ;; about the number of attempts (e.g. timeout). So it seems `unchecked-inc` is the
+         ;; best option here.
+         (let [next-i (unchecked-inc i)]
+           (if (retry? next-i)
+             (do
+               ;; clever optimisation which looks one step ahead and skips the final retries/delays
+               ;; this enables using 0 as the number of max-retries and no retries/delays will happen
+               (retry!+delay! next-i)
+               (recur next-i (f)))
+             ;; Finished trying - check for retryable-error
+             (if (retryable-error? res)
+               ;; and throw its cause as we're done retrying
+               (throw (.getCause res))
+               ;;otherwise throw fixed error with some info
+               (throw (ex-info "Retries exhausted!"
+                               {:retried i
+                                :last-result res}))))))))))
 
 (defmacro with-retries
   "Retries <body> until <condition> returns a truthy value.
@@ -208,21 +235,17 @@
   <exceptions> (a vector of exception classes).
   <opts> as per `with-retries*`, including the following:
   
-   :ex-pred    A fn of 1 argument (the exception object thrown), responsible for deciding
-                whether retrying should occur (or not). Provides finer control by giving a 
-                chance to recover from a particular exception."
+   :halt-on    A fn of 1 argument (the exception object thrown), responsible for deciding
+               whether retrying should occur (or not)."
   [opts exceptions & body]
   (cond-> `(with-retries*
              (constantly true)
-             (exception-success-condition ~exceptions)
+             exception-success-condition
              (fn []
                (ut/try+
                  (do ~@body)
-                 (catch-all ~exceptions ~'_e_
-                            (if-let [pred# (:ex-pred ~opts)]
-                              (or (pred# ~'_e_)
-                                  ajenda.retrying/ERROR)
-                              ajenda.retrying/ERROR)))))
+                 (catch-all ~exceptions e#
+                            (handle-error e# ~opts)))))
 
           opts (concat `[~opts])))
 
@@ -232,21 +255,17 @@
    it doesn't throw one of <exceptions> (a vector of exception classes).
    <opts> as per `with-retries*`, including the following:
 
-   :ex-pred    A fn of 1 argument (the exception object thrown), responsible for deciding
-                whether retrying should occur (or not). Provides finer control by giving a
-                chance to recover from a particular exception."
+   :halt-on    A fn of 1 argument (the exception object thrown), responsible for deciding
+                whether retrying should occur (or not)."
   [opts max-retries exceptions & body]
   (cond-> `(with-retries*
              (max-retries-limiter ~max-retries)
-             (exception-success-condition ~exceptions)
+             exception-success-condition
              (fn []
                (ut/try+
                  (do ~@body)
-                 (catch-all ~exceptions ~'_e_  ;; not the most hygienic thing to do
-                            (if-let [pred# (:ex-pred ~opts)]
-                              (or (pred# ~'_e_) 
-                                  ajenda.retrying/ERROR)
-                              ajenda.retrying/ERROR)))))
+                 (catch-all ~exceptions e#
+                            (handle-error e# ~opts)))))
 
           opts (concat `[~opts])))
 
@@ -285,44 +304,36 @@
   "Like `with-error-retries`, but with a timeout.
   <opts> as per `with-retries*`, including the following:
 
-   :ex-pred    A fn of 1 argument (the exception object thrown), responsible for deciding
-                whether retrying should occur (or not). Provides finer control by giving a
-                chance to recover from a particular exception."
+   :halt-on    A fn of 1 argument (the exception object thrown), responsible for deciding
+               whether retrying should occur (or not)."
   [opts timeout timeout-res exceptions & body]
   `(schedule/with-timeout ~timeout nil ~timeout-res
      (with-retries*
        (complement ut/thread-interrupted?)
-       (exception-success-condition ~exceptions)
+       exception-success-condition
        (fn []
          (ut/try+
            (do ~@body)
-           (catch-all ~exceptions ~'_e_
-                      (if-let [pred# (:ex-pred ~opts)]
-                        (or (pred# ~'_e_)
-                            ajenda.retrying/ERROR)
-                        ajenda.retrying/ERROR))))
+           (catch-all ~exceptions e#
+                      (handle-error e# ~opts))))
        ~opts)))
 
 (defmacro with-max-error-retries-timeout
   "Like `with-error-retries-timeout`, but with a retries limit.
   <opts> as per `with-retries*`, including the following:
 
-   :ex-pred    A fn of 1 argument (the exception object thrown), responsible for deciding
-                whether retrying should occur (or not). Provides finer control by giving a
-                chance to recover from a particular exception."
+   :halt-on    A fn of 1 argument (the exception object thrown), responsible for deciding
+                whether retrying should occur (or not)."
   [opts timeout timeout-res max-retries exceptions & body]
   `(schedule/with-timeout ~timeout nil ~timeout-res
      (with-retries*
        (every-pred (max-retries-limiter ~max-retries)
                    (complement ut/thread-interrupted?))
-       (exception-success-condition ~exceptions)
+       exception-success-condition
        (fn []
          (ut/try+
            (do ~@body)
-           (catch-all ~exceptions ~'_e_
-                      (if-let [pred# (:ex-pred ~opts)]
-                        (or (pred# ~'_e_)
-                            ajenda.retrying/ERROR)
-                        ajenda.retrying/ERROR))))
+           (catch-all ~exceptions e#
+                      (handle-error e# ~opts))))
        ~opts)))
 

@@ -7,8 +7,8 @@
 (deftest with-max-retries-tests
   (let [check-box (AtomicInteger. 0)]
 
-    ;; limit reached - no result - return nil
-    (is (nil? (with-max-retries nil 10 nil? (.incrementAndGet check-box))))
+    ;; limit reached - no result - we throw
+    (is (thrown? ExceptionInfo (with-max-retries nil 10 nil? (.incrementAndGet check-box))))
     (is (= 11 (.get check-box)))
 
     ;; returns result
@@ -20,8 +20,9 @@
 (deftest with-max-retries-timeout-tests
   (let [check-box (AtomicInteger. 0)]
 
-    ;; retry limit reached - return nil
-    (is (nil? (with-max-retries-timeout nil 10 :timeout 1000 nil? (.incrementAndGet check-box))))
+    ;; retry limit reached - we throw
+    (is (thrown? ExceptionInfo
+                 (with-max-retries-timeout nil 10 :timeout 1000 nil? (.incrementAndGet check-box))))
 
     ;; timeout limit reached - interrupt thread - return :timeout
     (is (= :timeout
@@ -62,9 +63,9 @@
 
 
     (.set check-box 0)
-    (testing "`:ex-pred` option"
-      (is (true?
-            (with-error-retries {:ex-pred (fn [e] (= "foo" (.getMessage e)))}
+    (testing "`:halt-on` option"
+      (is (thrown? IndexOutOfBoundsException ;; the first non-retryable error succeeds
+            (with-error-retries {:halt-on (fn [e] (= "foo" (.getMessage e)))}
                                 [ArithmeticException IndexOutOfBoundsException]
                                 (condp = (.getAndIncrement check-box)
                                   5 (throw (IndexOutOfBoundsException. "foo"))
@@ -98,8 +99,8 @@
   (testing "with-max-error-retries"
     (let [check-box (AtomicInteger. 0)]
 
-      ;; max-retries elapsed - no answer
-      (is (nil?
+      ;; max-retries elapsed - no answer means throw exception
+      (is (thrown? ExceptionInfo
             (with-max-error-retries {:retry-fn! default-log-fn} 3
                                     [ArithmeticException IndexOutOfBoundsException ExceptionInfo]
                                     (condp = (.getAndIncrement check-box)
@@ -131,7 +132,7 @@
 
     (.set check-box 0)
     ;; answer found before timeout
-    (is (= 1 (with-retries-timeout nil 20 :done some? (.incrementAndGet check-box))))
+    (is (#{1 2} (with-retries-timeout nil 20 :done some? (.incrementAndGet check-box))))
     )
   )
 
@@ -175,10 +176,12 @@
 
     (testing "testing :retry-fn!"
 
-      (with-max-retries {:retry-fn! (fn [_] (.getAndIncrement check-box))}
-                        10
-                        (constantly false)
-                        (.getAndIncrement check-box))
+      (try
+        (with-max-retries {:retry-fn! (fn [_] (.getAndIncrement check-box))}
+                          10
+                          (constantly false)
+                          (.getAndIncrement check-box))
+        (catch ExceptionInfo _ nil))
 
       ;; got incremented twice per iteration (1 attempt + 10 retries)
       ;; `retry-fn` was NOT called in the very last iteration (hence 21 instead of 22)
