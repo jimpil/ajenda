@@ -99,7 +99,7 @@ Hi!
 1. *with-timeout* [ms executor-service timeout-result & body]
 
 Very similar to `clojure.core/deref-future`, except that it will also cancel the future upon timeout!
-NOTE THAT CANCELLING THE FUTURE DOESN'T NECESSARILY STOP THE THREAD. THE CODE RUNNING ON THAT FUTURE SHOULD BE 
+NOTE THAT CANCELLING THE FUTURE DOES NOT NECESSARILY STOP THE THREAD. THE CODE RUNNING ON THAT FUTURE SHOULD BE 
 ACTIVELY CHECKING FOR THE INTERRUPT CAUSED BY THE CANCELLING CALL (see the source of `ajenda.retrying/with-retries-timeout` for a good example).
 
 Example:
@@ -139,7 +139,7 @@ Example:
 ```
 
 
-2. *do-after!* [delay exec & body]
+2. *do-after!* [delay executor & body]
 
 Schedules `<body>` for execution after <delay> milliseconds.
 
@@ -182,8 +182,8 @@ Returns the same vector of 2 functions as `adhoc-multischedule`.
  
 ## Notes 
  
-1. As evidenced by the demo code above, wherever you see an <executor> argument in `ajenda.planning`, you can pass nil and one will be created for you (via `Executors/newSingleThreadScheduledExecutor`). 
-2. `ajenda.expiring/with-timeout` can also take nil as its <exec> argument, in which case it will create a future.
+1. As evidenced by the demo code above, wherever you see a 'pool' (Executor) argument in `ajenda.planning`, you can pass nil and one will be created for you (via `Executors/newSingleThreadScheduledExecutor` or `Executors/newScheduledThreadPool`). 
+2. `ajenda.expiring/with-timeout` can also take nil as its 'executor-service' argument, in which case it will create a future.
 3.  There are public functions that are suffixed with *. These are actually the functions that do all the work, but they don't always mirror the arguments of the macros - so take caution using those!   
 
 
